@@ -1,4 +1,6 @@
-package net.scidane.akka.samples
+/**
+  * Created by petec on 1/8/17.
+  */
 
 import akka.actor._
 
