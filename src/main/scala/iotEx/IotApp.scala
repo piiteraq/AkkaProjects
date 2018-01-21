@@ -1,6 +1,7 @@
-package net.scidane.akka.sample
+package iotEx
 
 import akka.actor.ActorSystem
+
 import scala.io.StdIn
 
 object IotApp {

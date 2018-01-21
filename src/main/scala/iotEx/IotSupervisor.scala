@@ -1,6 +1,6 @@
-package net.scidane.akka.sample
+package iotEx
 
-import akka.actor.{ Actor, ActorLogging, Props }
+import akka.actor.{Actor, ActorLogging, Props}
 
 object IotSupervisor {
   def props(): Props = Props(new IotSupervisor)

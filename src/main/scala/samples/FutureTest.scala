@@ -1,11 +1,12 @@
+package samples
+
 /**
   * Created by petec on 1/10/17.
   */
 
-import concurrent.{Future}
-import concurrent.ExecutionContext.Implicits.global
-import util.{Failure, Success}
-import util.Random
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.util.{Failure, Random, Success}
 
 object FutureTest extends App {
 

@@ -1,8 +1,6 @@
-/**
-  * Created by petec on 1/8/17.
-  */
+package samples
 
-import akka.actor._
+import akka.actor.Actor
 
 class Number5 extends Actor {
   def receive = {
@@ -15,14 +13,4 @@ class Number5 extends Actor {
     println("Number5::preRestart called")
   }
   override def postRestart(reason: Throwable) = { println("Number5::postRestart called") }
-}
-
-object KillActor extends App {
-  val system = ActorSystem("KillTestSystem")
-  val number5 = system.actorOf(Props[Number5], name="Number5")
-
-  number5 ! "hello"
-  // Send the kill message
-  number5 ! Kill
-  system.terminate
 }
