@@ -93,3 +93,35 @@ object RunningMultipleCalcs extends App {
   Thread.sleep(2000)
 
 }
+
+object PromiseExample extends App {
+  import scala.concurrent.{ Future, Promise }
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  val p = Promise[Double]()
+  val f = p.future
+
+  val producer = Future {
+    val r = Math.PI
+    println(s"Producer adding $r to promise")
+    //p success r
+    p failure new Exception("Barff !")
+    println("Producer continuing with other work ..")
+    Thread.sleep(2000)
+  }
+
+  val consumer = Future {
+    println("Consumer doing initial work")
+    Thread.sleep(500)
+    //f foreach (r => println(s"Result: $r"))
+    f onComplete {
+      case Success(r) => println(s"Success: $r")
+      case Failure(err) => println(s"Failed: $err")
+    }
+
+
+
+  }
+
+  Thread.sleep(2000)
+}

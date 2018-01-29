@@ -4,7 +4,7 @@ import akka.actor.Actor
 
 class Kenny extends Actor {
   def receive = {
-    case Explode => throw new Exception("Boom!")
+    case Explode => println("Now exploding .."); throw new Exception("Boom!")
     case msg => println(s"Kenny received a message: $msg")
   }
   override def preStart = { println("kenny::preStart") }
