@@ -5,6 +5,8 @@ import akka.actor.{Actor, ActorRef, Props}
 
 object Greeter {
   def props(message: String, printerActor: ActorRef): Props = actor.Props(new Greeter(message, printerActor))
+
+  // Define messages
   final case class WhoToGreet(who: String)
   case object Greet
 }

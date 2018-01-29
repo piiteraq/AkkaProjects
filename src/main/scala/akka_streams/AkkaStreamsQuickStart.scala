@@ -10,6 +10,7 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import java.nio.file.Paths
 
+import akka.stream.scaladsl.Tcp.{IncomingConnection, ServerBinding}
 import akka_streams.AkkaStreamsQuickStart.{result, system}
 
 import scala.util.Try
@@ -297,4 +298,168 @@ object StreamEx4 extends App {
     ClosedShape
   }).run()
 
+}
+
+
+// How to implement a recover strategy for upstream failure
+object StreamEx5 extends App {
+
+  import akka.actor.ActorSystem
+  import akka.stream.ActorMaterializer
+  import akka.stream.scaladsl._
+  implicit val system = ActorSystem("stream-ex4")
+  implicit val materializer = ActorMaterializer()
+  implicit val ec = system.dispatcher // Execution context ~ thread pool
+
+  val planB = Source(List("five", "six", "seven", "eight"))
+
+  val result: Future[Done] = Source(0 to 10).map(n ⇒
+    if (n < 5) n.toString
+    else throw new RuntimeException("Boom!")
+  ).recoverWithRetries(attempts = 1, {
+    case _: RuntimeException ⇒ planB
+  }).runForeach(println)
+
+
+  result.onComplete { res =>
+    println(s"Res: $res")
+    system.terminate()
+  }
+
+}
+
+
+// How to implement a supervision strategy
+object StreamEx6 extends App {
+
+  import akka.actor.ActorSystem
+  import akka.stream.ActorMaterializer
+  import akka.stream.scaladsl._
+
+  implicit val system = ActorSystem("stream-ex4")
+  implicit val ec = system.dispatcher // Execution context ~ thread pool
+
+  val decider: Supervision.Decider = {
+    case _: ArithmeticException ⇒ Supervision.Resume
+    case _                      ⇒ Supervision.Stop
+  }
+
+  implicit val materializer = ActorMaterializer(
+    ActorMaterializerSettings(system).withSupervisionStrategy(decider))
+
+  val flow = Flow[Int]
+    .filter(100 / _ < 50).map(elem ⇒ 100 / (5 - elem))
+    .withAttributes(ActorAttributes.supervisionStrategy(decider))
+  val source = Source(0 to 5).via(flow)
+
+  // The element causing division by zero will be dropped
+  // result here will be a Future completed with Success(228)
+  val result = source.runWith(Sink.fold(0)(_ + _))
+
+  result.onComplete { res =>
+    println(s"Res: $res")
+    system.terminate()
+  }
+}
+
+
+// How to implement a supervision strategy
+object StreamEx7 extends App {
+
+  import akka.actor.ActorSystem
+  import akka.stream.ActorMaterializer
+  import akka.stream.scaladsl._
+
+  implicit val system = ActorSystem("stream-ex4")
+  implicit val ec = system.dispatcher // Execution context ~ thread pool
+
+  implicit val materializer = ActorMaterializer()
+
+  val decider: Supervision.Decider = {
+    case _: IllegalArgumentException ⇒ Supervision.Restart
+    case _                           ⇒ Supervision.Stop
+  }
+
+  val flow = Flow[Int]
+    .scan(0) { (acc, elem) ⇒
+      if (elem < 0) throw new IllegalArgumentException("negative not allowed")
+      else acc + elem
+    }
+    .withAttributes(ActorAttributes.supervisionStrategy(decider))
+
+  val source = Source(List(1, 3, -1, 5, 7)).via(flow)
+
+  val result = source.limit(1000).runWith(Sink.seq)
+  // The negative element cause the scan stage to be restarted,
+  // i.e. start from 0 again
+  // result here will be a Future completed with Success(Vector(0, 1, 4, 0, 5, 12))
+
+  result.onComplete { res =>
+    println(s"Res: $res")
+    system.terminate()
+  }
+}
+
+
+// Streaming IO, echo example
+object StreamEx8 extends App {
+
+  import akka.actor.ActorSystem
+  import akka.stream.ActorMaterializer
+  import akka.stream.scaladsl._
+  import akka.stream.scaladsl.Framing
+
+  implicit val system = ActorSystem("stream-ex4")
+  implicit val ec = system.dispatcher // Execution context ~ thread pool
+  implicit val materializer = ActorMaterializer()
+
+  val connections: Source[IncomingConnection, Future[ServerBinding]] =
+    Tcp().bind("127.0.0.1", 8888)
+  connections runForeach { connection ⇒
+    println(s"New connection from: ${connection.remoteAddress}")
+
+    val echo = Flow[ByteString]
+      .via(Framing.delimiter(
+        ByteString("\n"),
+        maximumFrameLength = 256,
+        allowTruncation = true))
+      .map(_.utf8String)
+      .map(_ + "!!!\n")
+      .map(ByteString(_))
+
+    connection.handleWith(echo)
+  }
+
+}
+
+//
+object StreamEx9 extends App {
+
+  import akka.actor.ActorSystem
+  import akka.stream.ActorMaterializer
+  import akka.stream.scaladsl._
+  import akka.stream.scaladsl.Framing
+
+  implicit val system = ActorSystem("stream-ex4")
+  implicit val ec = system.dispatcher // Execution context ~ thread pool
+  implicit val materializer = ActorMaterializer()
+
+  val connection = Tcp().outgoingConnection("127.0.0.1", 8888)
+
+  val replParser =
+    Flow[String].takeWhile(_ != "q")
+      .concat(Source.single("BYE"))
+      .map(elem ⇒ ByteString(s"$elem\n"))
+
+  val repl = Flow[ByteString]
+    .via(Framing.delimiter(
+      ByteString("\n"),
+      maximumFrameLength = 256,
+      allowTruncation = true))
+    .map(_.utf8String)
+    .map(text ⇒ println("Server: " + text))
+    .map(_ ⇒ readLine("> "))
+    .via(replParser)
+
+  connection.join(repl).run()
 }

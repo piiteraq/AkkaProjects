@@ -4,6 +4,8 @@ import akka.actor.{Actor, ActorLogging, Props}
 
 object Printer {
   def props: Props = Props[Printer]
+
+  // Define messages
   final case class Greeting(greeting: String)
 }
 
