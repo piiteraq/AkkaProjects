@@ -11,9 +11,9 @@ import scala.concurrent.duration._
 import java.nio.file.Paths
 
 import akka.stream.scaladsl.Tcp.{IncomingConnection, ServerBinding}
-import akka_streams.AkkaStreamsQuickStart.{result, system}
-
+import akka_streams.AkkaStreamsQuickStart.{system}
 import scala.util.Try
+
 
 object AkkaStreamsQuickStart extends App {
 
@@ -35,13 +35,11 @@ object AkkaStreamsQuickStart extends App {
 
   val factorials = source.scan(BigInt(1))((acc, next) ⇒ acc * next)
   val result: Future[Done] = {
-
     factorials
       .zipWith(Source(0 to MaxFac-1))((num, idx) ⇒ s"$idx! = $num")
-      .throttle(5, 1.second, 1, ThrottleMode.shaping) // Throttle the flow. Throttle combinator adds back-pressure.
+      .throttle(10, 1.second, 1, ThrottleMode.shaping) // Throttle the flow. Throttle combinator adds back-pressure.
       .runForeach(println)
-
-    //factorials.map(_.toString).runWith(lineSink("/Users/petec/factorials.txt"))
+    //factorials.map(_.toString).runWith(lineSink("/home/petec/factorials.txt"))
   }
 
   result.onComplete {
