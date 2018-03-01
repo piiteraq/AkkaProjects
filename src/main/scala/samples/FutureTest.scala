@@ -119,8 +119,6 @@ object PromiseExample extends App {
       case Failure(err) => println(s"Failed: $err")
     }
 
-
-
   }
 
   Thread.sleep(2000)
