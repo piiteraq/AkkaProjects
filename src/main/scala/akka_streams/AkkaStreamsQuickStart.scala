@@ -11,9 +11,9 @@ import scala.concurrent.duration._
 import java.nio.file.Paths
 
 import akka.stream.scaladsl.Tcp.{IncomingConnection, ServerBinding}
-import akka_streams.AkkaStreamsQuickStart.{system}
-import scala.util.Try
+import akka_streams.AkkaStreamsQuickStart.{result, system}
 
+import scala.util.{Failure, Success, Try}
 
 object AkkaStreamsQuickStart extends App {
 
@@ -30,21 +30,27 @@ object AkkaStreamsQuickStart extends App {
   // Ex2: Factorials
   def lineSink(filename: String): Sink[String, Future[IOResult]] =
     Flow[String]
+      .zipWith(Source(0 to MaxFac-1))((num, idx) ⇒ s"$idx! = $num")
       .map(s ⇒ ByteString(s + "\n"))
       .toMat(FileIO.toPath(Paths.get(filename)))(Keep.right)
 
   val factorials = source.scan(BigInt(1))((acc, next) ⇒ acc * next)
-  val result: Future[Done] = {
+  val result = {
+
     factorials
       .zipWith(Source(0 to MaxFac-1))((num, idx) ⇒ s"$idx! = $num")
-      .throttle(10, 1.second, 1, ThrottleMode.shaping) // Throttle the flow. Throttle combinator adds back-pressure.
+      .throttle(10, 1.second, 20, ThrottleMode.shaping) // Throttle the flow. Throttle combinator adds back-pressure.
       .runForeach(println)
-    //factorials.map(_.toString).runWith(lineSink("/home/petec/factorials.txt"))
+
+    //factorials.map(_.toString).runWith(lineSink("/Users/petec/factorials.txt"))
   }
 
   result.onComplete {
-    res =>
-      println(s"Result: $res")
+    case Success(res) =>
+      println(s"Success: $res")
+      system.terminate()
+    case Failure(err) =>
+      println(s"Failure: $err")
       system.terminate()
   } // Remember to terminate the actor system ..
 }
@@ -84,13 +90,12 @@ object TweetEx extends App {
   implicit val ec = system.dispatcher // Execution context ~ thread pool
 
   val result: Future[Done] = tweets
+    .buffer(10, OverflowStrategy.backpressure)
     .map(_.hashtags) // Get all sets of hashtags ...
     .reduce(_ ++ _) // ... and reduce them to a single set, removing duplicates across all tweets
     .mapConcat(identity) // Flatten the stream of tweets to a stream of hashtags
     .map(_.name.toUpperCase) // Convert all hashtags to upper case
     .runWith(Sink.foreach(println)) // Attach the Flow to a Sink that will finally print the hashtags
-
-  // $FiddleDependency org.akka-js %%% akkajsactorstream % 1.2.5.1
 
   result.onComplete { _ => system.terminate() }
 }
