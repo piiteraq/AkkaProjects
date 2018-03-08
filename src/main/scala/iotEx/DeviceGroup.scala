@@ -13,7 +13,6 @@ class DeviceGroup(groupId: String) extends Actor with ActorLogging {
   var actorToDeviceId = Map.empty[ActorRef, String]
 
   override def preStart(): Unit = log.info("DeviceGroup {} started", groupId)
-
   override def postStop(): Unit = log.info("DeviceGroup {} stopped", groupId)
 
   override def receive: Receive = {
@@ -32,7 +31,7 @@ class DeviceGroup(groupId: String) extends Actor with ActorLogging {
 
     case RequestTrackDevice(groupId, deviceId) =>
       log.warning(
-        "Ignoring TrackDevice request for {}. This actor is responsible for {}.",
+        "Ignoring TrackDevice request for group {}. This actor is responsible for group {}.",
         groupId, this.groupId)
 
     case Terminated(deviceActor) =>
