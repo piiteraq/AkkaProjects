@@ -1,14 +1,19 @@
 package iotEx
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
-import akka.actor.Actor.Receive
 import iotEx.DeviceManager.RequestTrackDevice
 
 object DeviceGroup {
   def props(groupId: String): Props = Props(new DeviceGroup(groupId))
+
+  final case class RequestDeviceList(requestId: Long)
+  final case class ReplyDeviceList(requestId: Long, ids: Set[String])
 }
 
 class DeviceGroup(groupId: String) extends Actor with ActorLogging {
+
+  import DeviceGroup._
+
   var deviceIdToActor = Map.empty[String, ActorRef]
   var actorToDeviceId = Map.empty[ActorRef, String]
 
@@ -33,6 +38,9 @@ class DeviceGroup(groupId: String) extends Actor with ActorLogging {
       log.warning(
         "Ignoring TrackDevice request for group {}. This actor is responsible for group {}.",
         groupId, this.groupId)
+
+    case RequestDeviceList(requestId) ⇒
+      sender() ! ReplyDeviceList(requestId, deviceIdToActor.keySet)
 
     case Terminated(deviceActor) =>
       val deviceId = actorToDeviceId(deviceActor)

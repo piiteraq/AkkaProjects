@@ -1,7 +1,8 @@
 package iotEx
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, PoisonPill}
 import akka.testkit.{ImplicitSender, TestActors, TestKit, TestProbe}
+
 import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
@@ -95,20 +96,63 @@ class TestSpec() extends TestKit(ActorSystem("TestSpec")) with ImplicitSender
     probe.expectNoMessage(500.milliseconds)
   }
 
-  "return same actor for same deviceId" in {
+  "device group return same actor for same deviceId" in {
     val probe = TestProbe()
     val groupActor = system.actorOf(DeviceGroup.props("group"))
 
     groupActor.tell(DeviceManager.RequestTrackDevice("group", "device1"), probe.ref)
     probe.expectMsg(DeviceManager.DeviceRegistered)
+    // Device actor responds directly back to the probe, not through the group actor
     val deviceActor1 = probe.lastSender
-
     groupActor.tell(DeviceManager.RequestTrackDevice("group", "device1"), probe.ref)
     probe.expectMsg(DeviceManager.DeviceRegistered)
     val deviceActor2 = probe.lastSender
 
     deviceActor1 should ===(deviceActor2)
   }
+
+  "device group be able to list active devices" in {
+    val probe = TestProbe()
+    val groupActor = system.actorOf(DeviceGroup.props("group"))
+
+    groupActor.tell(DeviceManager.RequestTrackDevice("group", "device1"), probe.ref)
+    probe.expectMsg(DeviceManager.DeviceRegistered)
+
+    groupActor.tell(DeviceManager.RequestTrackDevice("group", "device2"), probe.ref)
+    probe.expectMsg(DeviceManager.DeviceRegistered)
+
+    groupActor.tell(DeviceGroup.RequestDeviceList(requestId = 0), probe.ref)
+    probe.expectMsg(DeviceGroup.ReplyDeviceList(requestId = 0, Set("device1", "device2")))
+  }
+
+  "device group be able to list active devices after one shuts down" in {
+    val probe = TestProbe()
+    val groupActor = system.actorOf(DeviceGroup.props("group"))
+
+    groupActor.tell(DeviceManager.RequestTrackDevice("group", "device1"), probe.ref)
+    probe.expectMsg(DeviceManager.DeviceRegistered)
+    val deviceActorToShutDown = probe.lastSender
+
+    groupActor.tell(DeviceManager.RequestTrackDevice("group", "device2"), probe.ref)
+    probe.expectMsg(DeviceManager.DeviceRegistered)
+
+    groupActor.tell(DeviceGroup.RequestDeviceList(requestId = 0), probe.ref)
+    probe.expectMsg(DeviceGroup.ReplyDeviceList(requestId = 0, Set("device1", "device2")))
+
+    probe.watch(deviceActorToShutDown)
+    deviceActorToShutDown ! PoisonPill
+    probe.expectTerminated(deviceActorToShutDown)
+
+    // Since it might take some time for the device group to register that "device1"
+    // has terminated, 'probe.expectMsg' will throw an exception until that happens.
+    // The 'probe.awaitAssert' will keep reevaluating the assertion within the braces
+    // with a given time interval, until the 'expectMsg' passes.
+    probe.awaitAssert {
+      groupActor.tell(DeviceGroup.RequestDeviceList(requestId = 1), probe.ref)
+      probe.expectMsg(DeviceGroup.ReplyDeviceList(requestId = 1, Set("device2")))
+    }
+  }
+
 
 }
 
