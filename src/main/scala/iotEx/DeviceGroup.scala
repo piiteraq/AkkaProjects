@@ -2,12 +2,23 @@ package iotEx
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import iotEx.DeviceManager.RequestTrackDevice
+import scala.concurrent.duration._
 
 object DeviceGroup {
   def props(groupId: String): Props = Props(new DeviceGroup(groupId))
 
   final case class RequestDeviceList(requestId: Long)
   final case class ReplyDeviceList(requestId: Long, ids: Set[String])
+
+  final case class RequestAllTemperatures(requestId: Long)
+  final case class RespondAllTemperatures(requestId: Long, temperatures: Map[String, TemperatureReading])
+
+  // Algebraic datatype for temperature readings
+  sealed trait TemperatureReading
+  final case class Temperature(value: Double) extends TemperatureReading
+  case object TemperatureNotAvailable extends TemperatureReading
+  case object DeviceNotAvailable extends TemperatureReading
+  case object DeviceTimedOut extends TemperatureReading
 }
 
 class DeviceGroup(groupId: String) extends Actor with ActorLogging {
@@ -47,6 +58,14 @@ class DeviceGroup(groupId: String) extends Actor with ActorLogging {
       log.info("Device actor for {} has been terminated", deviceId)
       actorToDeviceId -= deviceActor
       deviceIdToActor -= deviceId
+
+    case RequestAllTemperatures(requestId) ⇒
+      context.actorOf(DeviceGroupQuery.props(
+        actorToDeviceId = actorToDeviceId,
+        requestId = requestId,
+        requester = sender(),
+        3.seconds
+      ))
 
   }
 }
