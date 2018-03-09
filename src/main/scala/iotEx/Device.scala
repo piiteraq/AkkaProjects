@@ -18,7 +18,6 @@ class Device(groupId: String, deviceId: String) extends Actor with ActorLogging 
   var lastTemperatureReading: Option[Double] = None
 
   override def preStart(): Unit = log.info("Device actor {}-{} started", groupId, deviceId)
-
   override def postStop(): Unit = log.info("Device actor {}-{} stopped", groupId, deviceId)
 
   override def receive: Receive = {
@@ -39,4 +38,5 @@ class Device(groupId: String, deviceId: String) extends Actor with ActorLogging 
     case ReadTemperature(id) =>
       sender() ! RespondTemperature(id, lastTemperatureReading)
   }
+
 }

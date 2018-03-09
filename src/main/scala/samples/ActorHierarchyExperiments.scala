@@ -1,6 +1,7 @@
 package samples
 
 import akka.actor._
+
 import scala.io.StdIn
 
 object ActorHierarchyExperiments extends App {
@@ -13,3 +14,4 @@ object ActorHierarchyExperiments extends App {
   try StdIn.readLine()
   finally system.terminate()
 }
+
