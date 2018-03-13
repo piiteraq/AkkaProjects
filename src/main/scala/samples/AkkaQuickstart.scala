@@ -9,6 +9,7 @@ object AkkaQuickstart extends App {
 
   // Create the 'helloAkka' actor system
   val system: ActorSystem = ActorSystem("helloAkka")
+  //println(system.settings) // Prints out the merged configuration settings
 
   try {
     // Create the printer actor
