@@ -4,8 +4,9 @@ package samples
   * Routing Example from Akka User Guide
   */
 
-import akka.actor.{Actor, ActorSystem, Props, Terminated}
-import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
+import akka.routing._
+
 import scala.io.StdIn
 
 case class Work(content: String)
@@ -41,11 +42,12 @@ class Master extends Actor {
   }
 }
 
+// Example using routees created by the router itself
 object RoutingExample {
 
   def main(args: Array[String]) = {
 
-    val system = ActorSystem("RoutingExample")
+    val system = ActorSystem("RoutingExampleInternalRoutess")
     try {
 
       val master = system.actorOf(Props(new Master), "master")
@@ -60,5 +62,50 @@ object RoutingExample {
       system.terminate()
     }
   }
+}
+
+// Example using externally created routees
+class Workers extends Actor {
+  context.actorOf(Props[Worker], name = "w1")
+  context.actorOf(Props[Worker], name = "w2")
+  context.actorOf(Props[Worker], name = "w3")
+
+  override def receive = Map.empty // or '{ case _ => }'
+}
+
+
+object RoutingExampleExternalRoutees {
+
+  def main(args: Array[String]) = {
+
+    val system = ActorSystem("RoutingExampleExternalRoutees")
+
+    try {
+
+      // Method 1: create workers from config
+      system.actorOf(Props[Workers], "workers") // Create workers before creating router
+      val router3 = system.actorOf(FromConfig.props(), "router3") // Create the router
+
+      // Method 2: create workers programmatically
+      val paths = List("/user/workers/w1", "/user/workers/w2", "/user/workers/w3")
+      val router4 = system.actorOf(RoundRobinGroup(paths).props(), "router4")
+
+      println("***** Workers created by config")
+      for (i ← 1 to 10) {
+        router3 ! Work(s"By config: workload #$i")
+      }
+
+      println("***** Workers created programmatically")
+      for (i ← 1 to 10) {
+        router4 ! Work(s"Programmatically: workload #$i")
+      }
+
+    } finally {
+      println(">>> Press ENTER to terminate ..")
+      StdIn.readLine()
+      system.terminate()
+    }
+  }
 
 }
+
