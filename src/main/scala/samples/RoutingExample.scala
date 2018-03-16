@@ -50,7 +50,9 @@ object RoutingExample {
     val system = ActorSystem("RoutingExampleInternalRoutess")
     try {
 
-      val master = system.actorOf(Props(new Master), "master")
+      //val master = system.actorOf(Props(new Master), "master") // Method1: From Master class ..
+      //val master = system.actorOf(FromConfig.props(Props[Worker]), "master") // Method2: From config file ..
+      val master: ActorRef = system.actorOf(RoundRobinPool(5).props(Props[Worker]), "master") // Method3: Router configuration provided programmatically ..
 
       for (i ← 1 to 100) {
         master ! Work(s"workload #$i")
