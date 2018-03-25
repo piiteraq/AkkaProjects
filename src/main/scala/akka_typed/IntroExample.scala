@@ -58,7 +58,7 @@ object IntroExample extends App {
   val future: Future[Greeted] = system ? (Greet("world", _))
 
   for {
-    greeting ← future.recover { case ex ⇒ ex.getMessage }
+    greeting ← future.recover { case ex: Throwable ⇒ ex.getMessage }
     done ← {
       println(s"result: $greeting")
       system.terminate()

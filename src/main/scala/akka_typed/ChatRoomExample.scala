@@ -60,20 +60,33 @@ object ChatRoom {
     }
 }
 
-object Main extends App {
+object ChatRoomExampleMain extends App {
 
   import scala.concurrent.duration._
+
+  def messageGenerator(handle: ActorRef[PostMessage]) = {
+    handle ! PostMessage("Hello World!")
+    Thread.sleep(1000)
+    handle ! PostMessage("I'm not the ol' gipper ..")
+    Thread.sleep(1000)
+    handle ! PostMessage(".. but rather the ol' gabbler")
+    Thread.sleep(1000)
+    handle ! PostMessage("Goodbye World!")
+    Thread.sleep(1000)
+  }
 
   val gabbler =
     Behaviors.immutable[SessionEvent] { (_, msg) ⇒
       msg match {
-        case SessionGranted(handle) ⇒
-          handle ! PostMessage("Hello World!")
+        case SessionGranted(handle: ActorRef[PostMessage]) ⇒
+          messageGenerator(handle)
           Behaviors.same
         case MessagePosted(screenName, message) ⇒
-          println(s"message has been posted by '$screenName': $message")
+          println(s"Message posted by '$screenName': $message")
+          if (message.contains("Goodbye")) Behaviors.stopped else Behaviors.same
+        case SessionDenied(reason) =>
+          println(s"Session was denied, because: $reason")
           Behaviors.stopped
-        //TODO -- case SessionDenied(_) => ...
       }
     }
 
@@ -91,6 +104,6 @@ object Main extends App {
     }
 
   val system = ActorSystem(main, "ChatRoomDemo")
-  Await.result(system.whenTerminated, 3.seconds)
+  Await.result(system.whenTerminated, 10.seconds)
 
 }
